@@ -7,43 +7,46 @@ import java.io.*;
 
 public class Learner extends JFrame {
 
-    public static int WIDTH = 800;
-    public static int HEIGHT = 600;
-    public static Font font = new Font("Calibri", Font.PLAIN, 40);
-    public static ArrayList<String> originalQuestions = new ArrayList<>();
-    public static ArrayList<String> originalAnswers = new ArrayList<>();
-    public static ArrayList<String> taskQuestions = new ArrayList<>();
+    public static int WIDTH = 1000;
+    public static int HEIGHT = 700;
+    public static Font font = new Font("Courier New", Font.PLAIN, 50);
+    public static ArrayList<String> questions = new ArrayList<>();
+    public static ArrayList<String> answers = new ArrayList<>();
     public static HashSet<Integer> mistakenQuestions = new HashSet<>();
-    public static ArrayList<String> taskAnswers = new ArrayList<>();
+    public static ArrayList<Integer> activeQuestionsIndexes = new ArrayList<>();
+    
     public static int questionIndex = 0;
     public static Learner frame = new Learner();
     public static myPanel panel;
     public static String currentTestName;
+    public static String testTitle;
 
     public static void loadTest(String testname) {
         
         try (Scanner scanner = new Scanner(new File("tests/" + testname.strip() + ".txt"))) {
             questionIndex = 0;
             currentTestName = testname;
+            testTitle = scanner.nextLine();
             while (scanner.hasNextLine()) {
                 String question = scanner.nextLine();
                 String answer = scanner.nextLine();
-                taskQuestions.add(question);
-                originalQuestions.add(question);
-                taskAnswers.add(answer);
-                originalAnswers.add(answer);
+                questions.add(question);
+                answers.add(answer);
             }
         } catch (Exception e) {
             System.out.println("[Something went wrong while reading the test file!]\n >\t" + e);
         }
+
+        for (int i = 0; i < questions.size(); i++)
+            activeQuestionsIndexes.add(i);
         
     }
 
     public static void saveResult() {
         try (FileWriter file = new FileWriter("results/" + currentTestName + "_result.txt")) {
             for (int i : mistakenQuestions) {
-                file.write("Q: " + originalQuestions.get(i));
-                file.write("A: " + originalAnswers.get(i));
+                file.write("Q: " + questions.get(i) + "\n");
+                file.write("A: " + answers.get(i) + "\n");
             }
         } catch (Exception e) {
             System.out.println("[Something went wrong while writing results for the test \"" + currentTestName + "\"]\n >\t" + e);
@@ -70,6 +73,7 @@ class myPanel extends JPanel {
 
     public QuestionLabel question = new QuestionLabel();
     public AnswerField answerField = new AnswerField();
+    public InfoLabel infoLabel = new InfoLabel();
 
     public myPanel() {
         super();
@@ -80,6 +84,7 @@ class myPanel extends JPanel {
         
         add(question);
         add(answerField);
+        add(infoLabel);
 
     }
 
@@ -108,9 +113,33 @@ class QuestionLabel extends JLabel {
 
     public void nextQuestion() {
         Random random = new Random();
-        Learner.questionIndex = random.nextInt(Learner.taskQuestions.size());
-        // Learner.questionIndex = Learner.questions.size() == 0 ? 0 : (Learner.questionIndex + 1) % Learner.questions.size();
-        setText(Learner.taskQuestions.size() == 0 ? "[ENTER TEST NAME]" : Learner.taskQuestions.get(Learner.questionIndex));
+        if (Learner.activeQuestionsIndexes.size() != 0) {
+            Learner.questionIndex = Learner.activeQuestionsIndexes.get(random.nextInt(Learner.activeQuestionsIndexes.size()));
+            setText(Learner.questions.get(Learner.questionIndex));
+        } else {
+            setText("[ENTER TEST NAME]");
+        }
+    }
+
+}
+
+class InfoLabel extends JLabel {
+    
+    public InfoLabel() {
+        super();
+        setFont(Learner.font);
+        setForeground(Color.WHITE);
+    }
+
+    public void updateInfo() {
+        setText(String.format(
+            "<html>\"%s\"<br>&gt[%d/%d] (%d%%)&lt</html>", 
+            Learner.testTitle,
+            Learner.questions.size() - Learner.activeQuestionsIndexes.size(),
+            Learner.questions.size(),
+            (int) Math.ceil((1.d - (double) Learner.activeQuestionsIndexes.size() / (double) Learner.questions.size()) * 100.d)
+        ));
+        setBounds(0, 0, getPreferredSize().width, getPreferredSize().height);
     }
 
 }
@@ -133,23 +162,20 @@ class AnswerField extends JTextField implements KeyListener {
         setHorizontalAlignment(JTextField.CENTER);
 
         // Size
-        int width = Learner.WIDTH / 2;
+        int width = Learner.WIDTH / 2 + Learner.WIDTH / 4;
         setBounds(
             (Learner.WIDTH - width) / 2,
             Learner.HEIGHT - Learner.HEIGHT / 3,
             width,
             getPreferredSize().height
         );
-
-
     }
 
     public void checkAnswer() {
-        if (getText().strip().equals(Learner.taskAnswers.get(Learner.questionIndex))) {
+        if (getText().strip().equals(Learner.answers.get(Learner.questionIndex))) {
             if (getForeground() != Color.RED) {
-                Learner.taskQuestions.remove(Learner.questionIndex);
-                Learner.taskAnswers.remove(Learner.questionIndex);
-                if (Learner.taskQuestions.size() == 0)
+                Learner.activeQuestionsIndexes.remove(Learner.activeQuestionsIndexes.indexOf(Learner.questionIndex));
+                if (Learner.activeQuestionsIndexes.size() == 0)
                     Learner.saveResult();
             }
             Learner.panel.question.nextQuestion();
@@ -157,38 +183,35 @@ class AnswerField extends JTextField implements KeyListener {
             setText(""); // clearing the text field
         } else {
             setForeground(Color.RED);
-            setText(Learner.taskAnswers.get(Learner.questionIndex));
+            setText(Learner.answers.get(Learner.questionIndex));
             Learner.mistakenQuestions.add(Learner.questionIndex);
 
         }
-
+        
     }
-
-    
 
     @Override
     public void keyPressed(KeyEvent e) {
         if (e.getExtendedKeyCode() == 10) {
-            if (Learner.taskQuestions.size() == 0) { // loading test
+            if (Learner.activeQuestionsIndexes.size() == 0) { // loading test
                 if (!getText().isBlank()) {
                     Learner.loadTest(getText());
-                    Learner.panel.question.setText(Learner.taskQuestions.get(Learner.questionIndex));
+                    Learner.panel.question.nextQuestion();
+                    // Learner.panel.question.setText(Learner.questions.get(Learner.questionIndex));
                     setText("");
                 }
             } else {
                 checkAnswer();
             }
+            Learner.panel.infoLabel.updateInfo();
         }
-    }
-
-    @Override
-    public void keyTyped(KeyEvent e) {
         
     }
 
     @Override
-    public void keyReleased(KeyEvent e) {
+    public void keyTyped(KeyEvent e) { }
 
-    }
+    @Override
+    public void keyReleased(KeyEvent e) { }
 
 }
