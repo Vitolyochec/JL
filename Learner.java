@@ -12,7 +12,6 @@ public class Learner extends JFrame {
     public static Font font = new Font("Calibri", Font.PLAIN, 40);
     public static ArrayList<String> originalQuestions = new ArrayList<>();
     public static ArrayList<String> originalAnswers = new ArrayList<>();
-    // public static ArrayList<Integer> mistakenQuestions = new ArrayList<>(); 
     public static ArrayList<String> taskQuestions = new ArrayList<>();
     public static HashSet<Integer> mistakenQuestions = new HashSet<>();
     public static ArrayList<String> taskAnswers = new ArrayList<>();
